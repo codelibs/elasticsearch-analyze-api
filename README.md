@@ -22,8 +22,6 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-dynarank/issues
 
 ### Install Analyze API Plugin
 
-TBD...
-
     $ $ES_HOME/bin/plugin --install org.codelibs/elasticsearch-analyze-api/1.5.0
 
 ## Getting Started
