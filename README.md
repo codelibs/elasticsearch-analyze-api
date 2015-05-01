@@ -48,7 +48,7 @@ This plugin provides /_analyze_api API as below.
 You can analyze multiple texts in 1 request.
 
 | Parameter        | Description                                                    |
-|:----------------:|:--------------------------------------------------------------:|
+|:----------------:|:---------------------------------------------------------------|
 | default_index    | (Optional) A default index name to analyze texts.              |
 | default_analyzer | (Optional) A default analyzer name to analyze texts.           |
 | index_name       | (Optional) An index name to analyze text of the same block.    |
