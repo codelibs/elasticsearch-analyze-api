@@ -17,8 +17,8 @@ import junit.framework.TestCase;
 import org.codelibs.elasticsearch.runner.ElasticsearchClusterRunner;
 import org.codelibs.elasticsearch.runner.net.Curl;
 import org.codelibs.elasticsearch.runner.net.CurlResponse;
-import org.elasticsearch.common.settings.ImmutableSettings;
-import org.elasticsearch.common.settings.ImmutableSettings.Builder;
+import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.settings.Settings.Builder;
 import org.elasticsearch.node.Node;
 
 public class AnalyzeApiPluginTest extends TestCase {
@@ -29,8 +29,11 @@ public class AnalyzeApiPluginTest extends TestCase {
 
     private int numOfNode = 2;
 
+    private String clusterName;
+
     @Override
     protected void setUp() throws Exception {
+        clusterName = "es-analyzeapi-" + System.currentTimeMillis();
         // create runner instance
         runner = new ElasticsearchClusterRunner();
         // create ES nodes
@@ -38,12 +41,13 @@ public class AnalyzeApiPluginTest extends TestCase {
             @Override
             public void build(final int number, final Builder settingsBuilder) {
                 settingsBuilder.put("http.cors.enabled", true);
+                settingsBuilder.put("index.number_of_shards", 3);
+                settingsBuilder.put("index.number_of_replicas", 0);
+                settingsBuilder.putArray("discovery.zen.ping.unicast.hosts", "localhost:9301-9310");
+                settingsBuilder.put("plugin.types", "org.codelibs.elasticsearch.analyze.AnalyzeApiPlugin,org.elasticsearch.plugin.analysis.kuromoji.AnalysisKuromojiPlugin");
+                settingsBuilder.put("index.unassigned.node_left.delayed_timeout","0");
             }
-        }).build(
-                newConfigs()
-                        .clusterName(
-                                "es-analyze-api-" + System.currentTimeMillis())
-                        .ramIndexStore().numOfNode(numOfNode));
+        }).build(newConfigs().clusterName(clusterName).numOfNode(numOfNode));
 
         // wait for yellow status
         runner.ensureYellow();
@@ -90,7 +94,7 @@ public class AnalyzeApiPluginTest extends TestCase {
                 + "}"//
                 + "}}}";
         runner.createIndex(index,
-                ImmutableSettings.builder().loadFromSource(indexSettings)
+                Settings.builder().loadFromSource(indexSettings)
                         .build());
 
         try (CurlResponse response = Curl
