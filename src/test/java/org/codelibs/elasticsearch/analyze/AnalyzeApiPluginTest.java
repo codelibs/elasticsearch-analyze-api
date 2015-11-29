@@ -41,6 +41,7 @@ public class AnalyzeApiPluginTest extends TestCase {
             @Override
             public void build(final int number, final Builder settingsBuilder) {
                 settingsBuilder.put("http.cors.enabled", true);
+                settingsBuilder.put("http.cors.allow-origin", "*");
                 settingsBuilder.put("index.number_of_shards", 3);
                 settingsBuilder.put("index.number_of_replicas", 0);
                 settingsBuilder.putArray("discovery.zen.ping.unicast.hosts", "localhost:9301-9310");
