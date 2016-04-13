@@ -10,7 +10,8 @@ This plugin will be one of solutions if you want to use elasticsearch as a serve
 
 | Version   | Tested on Elasticsearch |
 |:---------:|:-----------------------:|
-| master    | 2.1.X                   |
+| master    | 2.3.X                   |
+| 2.2.0     | 2.2.2                   |
 | 2.1.1     | 2.1.1                   |
 | 1.5.0     | 1.5.2                   |
 
@@ -23,7 +24,7 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-dynarank/issues
 
 ### Install Analyze API Plugin
 
-    $ $ES_HOME/bin/plugin install org.codelibs/elasticsearch-analyze-api/2.1.1
+    $ $ES_HOME/bin/plugin install org.codelibs/elasticsearch-analyze-api/2.2.0
 
 ## Getting Started
 
