@@ -15,6 +15,10 @@ import org.apache.lucene.util.AttributeReflector;
 import org.apache.lucene.util.BytesRef;
 import org.codelibs.elasticsearch.analyze.exception.AnalyzeApiRequestException;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.cluster.ClusterService;
+import org.elasticsearch.cluster.metadata.AliasOrIndex;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
@@ -36,11 +40,13 @@ public class RestAnalyzeApiAction extends BaseRestHandler {
 
     private IndicesAnalysisService indicesAnalysisService;
 
+    private ClusterService clusterService;
+
     @Inject
-    public RestAnalyzeApiAction(final Settings settings, final Client client,
-            final RestController controller, IndicesService indicesService,
-            IndicesAnalysisService indicesAnalysisService) {
+    public RestAnalyzeApiAction(final Settings settings, final Client client, final RestController controller,
+            final ClusterService clusterService, final IndicesService indicesService, final IndicesAnalysisService indicesAnalysisService) {
         super(settings, controller, client);
+        this.clusterService = clusterService;
         this.indicesService = indicesService;
         this.indicesAnalysisService = indicesAnalysisService;
 
@@ -111,17 +117,9 @@ public class RestAnalyzeApiAction extends BaseRestHandler {
 
                 builder.startArray(name);
 
-                IndexService indexService = null;
-                if (indexName != null) {
-                    indexService = indicesService.indexServiceSafe(indexName);
-                }
-
-                Analyzer analyzer = null;
-                if (indexService == null) {
-                    analyzer = indicesAnalysisService.analyzer(analyzerName);
-                } else {
-                    analyzer = indexService.analysisService().analyzer(
-                            analyzerName);
+                Analyzer analyzer = getAnalyzer(indexName, analyzerName);
+                if (analyzer == null) {
+                    throw new AnalyzeApiRequestException(analyzerName + " in " + indexName + " is not found.");
                 }
 
                 try (TokenStream stream = analyzer.tokenStream(null,
@@ -180,6 +178,23 @@ public class RestAnalyzeApiAction extends BaseRestHandler {
             sendErrorResponse(channel, e);
         }
 
+    }
+
+    private Analyzer getAnalyzer(final String indexName, final String analyzerName) {
+        final MetaData metaData = clusterService.state().getMetaData();
+        final AliasOrIndex aliasOrIndex = metaData.getAliasAndIndexLookup().get(indexName);
+        if (aliasOrIndex != null) {
+            for (final IndexMetaData indexMD : aliasOrIndex.getIndices()) {
+                final IndexService indexService = indicesService.indexService(indexMD.getIndex());
+                if (indexService != null) {
+                    final Analyzer analyzer = indexService.analysisService().analyzer(analyzerName);
+                    if (analyzer != null) {
+                        return analyzer;
+                    }
+                }
+            }
+        }
+        return indicesAnalysisService.analyzer(analyzerName);
     }
 
     private void sendErrorResponse(final RestChannel channel, final Throwable t) {
