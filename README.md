@@ -1,4 +1,4 @@
-Elasticsearch Analyze API Pugin
+Elasticsearch Analyze API Plugin
 =======================
 
 ## Overview
