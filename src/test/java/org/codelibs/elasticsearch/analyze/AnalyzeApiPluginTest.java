@@ -27,7 +27,7 @@ public class AnalyzeApiPluginTest extends TestCase {
 
     private File[] userDictFiles;
 
-    private int numOfNode = 2;
+    private int numOfNode = 1;
 
     private String clusterName;
 
@@ -42,13 +42,10 @@ public class AnalyzeApiPluginTest extends TestCase {
             public void build(final int number, final Builder settingsBuilder) {
                 settingsBuilder.put("http.cors.enabled", true);
                 settingsBuilder.put("http.cors.allow-origin", "*");
-                settingsBuilder.put("index.number_of_shards", 3);
-                settingsBuilder.put("index.number_of_replicas", 0);
                 settingsBuilder.putArray("discovery.zen.ping.unicast.hosts", "localhost:9301-9310");
-                settingsBuilder.put("plugin.types", "org.codelibs.elasticsearch.analyze.AnalyzeApiPlugin,org.elasticsearch.plugin.analysis.kuromoji.AnalysisKuromojiPlugin");
-                settingsBuilder.put("index.unassigned.node_left.delayed_timeout","0");
             }
-        }).build(newConfigs().clusterName(clusterName).numOfNode(numOfNode));
+        }).build(newConfigs().clusterName(clusterName).numOfNode(numOfNode)
+                .pluginTypes("org.codelibs.elasticsearch.analyze.AnalyzeApiPlugin,org.codelibs.elasticsearch.ja.JaPlugin"));
 
         // wait for yellow status
         runner.ensureYellow();
@@ -62,11 +59,8 @@ public class AnalyzeApiPluginTest extends TestCase {
         runner.clean();
     }
 
-    private void updateDictionary(File file, String content)
-            throws IOException, UnsupportedEncodingException,
-            FileNotFoundException {
-        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream(file), "UTF-8"))) {
+    private void updateDictionary(File file, String content) throws IOException, UnsupportedEncodingException, FileNotFoundException {
+        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "UTF-8"))) {
             bw.write(content);
             bw.flush();
         }
@@ -77,8 +71,7 @@ public class AnalyzeApiPluginTest extends TestCase {
         for (int i = 0; i < numOfNode; i++) {
             String confPath = runner.getNode(i).settings().get("path.conf");
             userDictFiles[i] = new File(confPath, "userdict_ja.txt");
-            updateDictionary(userDictFiles[i],
-                    "東京スカイツリー,東京 スカイツリー,トウキョウ スカイツリー,カスタム名詞");
+            updateDictionary(userDictFiles[i], "東京スカイツリー,東京 スカイツリー,トウキョウ スカイツリー,カスタム名詞");
             userDictFiles[i].deleteOnExit();
         }
 
@@ -86,54 +79,38 @@ public class AnalyzeApiPluginTest extends TestCase {
 
         final String index = "dataset";
 
-        final String indexSettings = "{\"index\":{\"analysis\":{"
-                + "\"tokenizer\":{"//
-                + "\"kuromoji_user_dict\":{\"type\":\"kuromoji_tokenizer\",\"mode\":\"extended\",\"user_dictionary\":\"userdict_ja.txt\"}"
+        final String indexSettings = "{\"index\":{\"analysis\":{" + "\"tokenizer\":{"//
+                + "\"reloadable_kuromoji_user_dict\":{\"type\":\"reloadable_kuromoji_tokenizer\",\"mode\":\"extended\",\"user_dictionary\":\"userdict_ja.txt\"}"
                 + "},"//
                 + "\"analyzer\":{"
-                + "\"ja_analyzer\":{\"type\":\"custom\",\"tokenizer\":\"kuromoji_user_dict\",\"filter\":[\"kuromoji_stemmer\"]}"
-                + "}"//
+                + "\"ja_analyzer\":{\"type\":\"custom\",\"tokenizer\":\"reloadable_kuromoji_user_dict\",\"filter\":[\"reloadable_kuromoji_stemmer\"]}" + "}"//
                 + "}}}";
-        runner.createIndex(index,
-                Settings.builder().loadFromSource(indexSettings)
-                        .build());
+        runner.createIndex(index, Settings.builder().loadFromSource(indexSettings).build());
 
-        try (CurlResponse response = Curl
-                .post(node, "/_analyze_api")
-                .param("index", index)
-                .param("analyzer", "standard")
-                .body("{\"test1\":{\"text\":\"東京都\"},"
-                        + "\"test2\":{\"index\":\"" + index
-                        + "\",\"analyzer\":\"ja_analyzer\",\"text\":\"東京都\"}}")
+        try (CurlResponse response = Curl.post(node, "/_analyze_api").param("index", index).param("analyzer", "standard").body(
+                "{\"test1\":{\"text\":\"東京都\"}," + "\"test2\":{\"index\":\"" + index + "\",\"analyzer\":\"ja_analyzer\",\"text\":\"東京都\"}}")
                 .execute()) {
             Map<String, Object> contentAsMap = response.getContentAsMap();
             assertEquals(2, contentAsMap.size());
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> test1List = (List<Map<String, Object>>) contentAsMap
-                    .get("test1");
+            List<Map<String, Object>> test1List = (List<Map<String, Object>>) contentAsMap.get("test1");
             assertEquals(3, test1List.size());
             assertEquals("東", test1List.get(0).get("term").toString());
             assertEquals("京", test1List.get(1).get("term").toString());
             assertEquals("都", test1List.get(2).get("term").toString());
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> test2List = (List<Map<String, Object>>) contentAsMap
-                    .get("test2");
+            List<Map<String, Object>> test2List = (List<Map<String, Object>>) contentAsMap.get("test2");
             assertEquals(2, test2List.size());
             assertEquals("東京", test2List.get(0).get("term").toString());
             assertEquals("都", test2List.get(1).get("term").toString());
         }
 
-        try (CurlResponse response = Curl
-                .post(node, "/" + index + "/_analyze_api")
-                .param("position", "true")
-                .param("start_offset", "true")
-                .body("{\"test1\":{\"analyzer\":\"ja_analyzer\",\"text\":\"東京都\"}}")
-                .execute()) {
+        try (CurlResponse response = Curl.post(node, "/" + index + "/_analyze_api").param("position", "true").param("start_offset", "true")
+                .body("{\"test1\":{\"analyzer\":\"ja_analyzer\",\"text\":\"東京都\"}}").execute()) {
             Map<String, Object> contentAsMap = response.getContentAsMap();
             assertEquals(1, contentAsMap.size());
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> test1List = (List<Map<String, Object>>) contentAsMap
-                    .get("test1");
+            List<Map<String, Object>> test1List = (List<Map<String, Object>>) contentAsMap.get("test1");
             assertEquals(2, test1List.size());
             assertEquals("東京", test1List.get(0).get("term").toString());
             assertEquals("1", test1List.get(0).get("position").toString());
