@@ -27,7 +27,7 @@ Please file an [issue](https://github.com/codelibs/elasticsearch-dynarank/issues
 
 ### For 5.x
 
-    $ $ES_HOME/bin/elasticsearch-plugin install org.codelibs:elasticsearch-analyze-api/5.1.0
+    $ $ES_HOME/bin/elasticsearch-plugin install org.codelibs:elasticsearch-analyze-api:5.1.0
 
 ### For 2.x
 
