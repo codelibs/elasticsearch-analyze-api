@@ -13,20 +13,17 @@ import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
 import org.apache.lucene.util.Attribute;
 import org.apache.lucene.util.AttributeReflector;
 import org.apache.lucene.util.BytesRef;
+import org.codelibs.elasticsearch.analyze.AnalyzeApiPlugin.PluginComponent;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.cluster.metadata.AliasOrIndex;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
-import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.bytes.BytesReference;
-import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
 import org.elasticsearch.index.IndexService;
-import org.elasticsearch.index.analysis.AnalysisRegistry;
-import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.rest.BaseRestHandler;
 import org.elasticsearch.rest.BytesRestResponse;
 import org.elasticsearch.rest.RestChannel;
@@ -36,24 +33,17 @@ import org.elasticsearch.search.lookup.SourceLookup;
 
 public class RestAnalyzeApiAction extends BaseRestHandler {
 
-    private IndicesService indicesService;
+    private PluginComponent pluginComponent;
 
-    private AnalysisRegistry analysisRegistry;
-
-    private ClusterService clusterService;
-
-    @Inject
-    public RestAnalyzeApiAction(final Settings settings, final RestController controller, final ClusterService clusterService,
-            final IndicesService indicesService, final AnalysisRegistry analysisRegistry) {
+    public RestAnalyzeApiAction(final Settings settings, final RestController controller, final PluginComponent pluginComponent) {
         super(settings);
-        this.clusterService = clusterService;
-        this.indicesService = indicesService;
-        this.analysisRegistry = analysisRegistry;
+        this.pluginComponent = pluginComponent;
 
         controller.registerHandler(RestRequest.Method.GET, "/_analyze_api", this);
         controller.registerHandler(RestRequest.Method.GET, "/{index}/_analyze_api", this);
         controller.registerHandler(RestRequest.Method.POST, "/_analyze_api", this);
         controller.registerHandler(RestRequest.Method.POST, "/{index}/_analyze_api", this);
+
     }
 
     @Override
@@ -161,11 +151,12 @@ public class RestAnalyzeApiAction extends BaseRestHandler {
     }
 
     private Analyzer getAnalyzer(final String indexName, final String analyzerName) throws IOException {
-        final MetaData metaData = clusterService.state().getMetaData();
+        final MetaData metaData = pluginComponent.getAnalyzeApiService().getClusterService().state().getMetaData();
         final AliasOrIndex aliasOrIndex = metaData.getAliasAndIndexLookup().get(indexName);
         if (aliasOrIndex != null) {
             for (final IndexMetaData indexMD : aliasOrIndex.getIndices()) {
-                final IndexService indexService = indicesService.indexService(indexMD.getIndex());
+                final IndexService indexService =
+                        pluginComponent.getAnalyzeApiService().getIndicesService().indexService(indexMD.getIndex());
                 if (indexService != null) {
                     final Analyzer analyzer = indexService.getIndexAnalyzers().get(analyzerName);
                     if (analyzer != null) {
@@ -174,7 +165,7 @@ public class RestAnalyzeApiAction extends BaseRestHandler {
                 }
             }
         }
-        return analysisRegistry.getAnalyzer(analyzerName);
+        return pluginComponent.getAnalyzeApiService().getAnalysisRegistry().getAnalyzer(analyzerName);
     }
 
     private void sendErrorResponse(final RestChannel channel, final Exception e) {
